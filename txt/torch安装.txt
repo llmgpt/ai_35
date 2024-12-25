@@ -1,0 +1,37 @@
+1.查看cuda版本
+nvidia-smi
+-监测GPU利用率,每5s
+nvidia-smi -l
+
+2.环境准备
+conda create -n torch110 python=3.9
+conda activate torch110
+conda list torch
+conda info --envs
+conda remove -n torch110 --all
+
+3.安装torch
+pip install torch==1.10.0+cu113 torchvision==0.11.1+cu113 torchaudio==0.10.0+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
+pip install torch==1.10.1+cu102 torchvision==0.11.2+cu102 torchaudio==0.10.1 -f https://download.pytorch.org/whl/cu102/torch_stable.html
+conda install pytorch==1.10.0 torchvision==0.11.0 torchaudio==0.10.0 cudatoolkit=11.3
+
+4.检查cuda是否可用
+torch.cuda.is_available()
+
+5.清华源
+https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/pytorch/win-64/
+
+6.conda换源
+conda config --show channels  # 查看当前的channels
+conda config --remove-key channels  # 恢复conda的官方默认源
+conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main # 添加清华源的四个通道
+conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free
+conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/r
+conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/pytorch/
+
+7.一次换清华源
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple matplotlib==3.5.2
+pip install -i https://mirrors.aliyun.com/pypi/simple/ opencv-python==4.5.5.64
+
+8.pip换源
+pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
