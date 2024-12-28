@@ -6,12 +6,13 @@ import torch
 import math
 from train_datasets import tgt_vocab_size, src_vocab_size # 目标词库长度,源词库长度
 from train_dataloader import loader
+import numpy as np
 d_model = 512 # 词嵌入维度 = d_k * n_heads
 d_k = d_v = 64  # dimension of K(=Q), V（Q和K的维度需要相同，这里为了方便让K=V）
 n_heads = 8  # number of heads in Multi-Head Attention（有几套头）
 n_layers = 6  # number of Encoder of Decoder Layer（Block的个数）
 d_ff = 2048 # FeedForward dimension (两次线性层中的隐藏层 512->2048->512，线性层是用来做特征提取的），当然最后会再接一个projection层
-
+device = 'cuda' # 指定设备，有点问题。
 # 3.3
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, dropout=0.1, max_len=5000):
@@ -20,8 +21,11 @@ class PositionalEncoding(nn.Module):
 
         pe = torch.zeros(max_len, d_model) # 位置编码初始化矩阵，全是0的（5000，512） 为啥这么高？
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1) # （5000，1）顺序
-        div_term = torch.exp(torch.arange(
-            0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        # 生成维度矩阵 i，大小为 (1, d_model)
+        i = torch.arange(0, d_model, 2).float()  # (d_model/2,)
+        # 计算分母：10000 ^ (2i / d_model)
+        div_term = torch.exp(i * (-math.log(10000.0) / d_model))  # (d_model/2,)
+        # div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0).transpose(0, 1) # （5000， 1， 512）
@@ -61,10 +65,10 @@ def get_attn_subsequence_mask(seq):
     attn_shape = [seq.size(0), seq.size(1), seq.size(1)]
     # attn_shape: [batch_size, tgt_len, tgt_len]
     subsequence_mask = np.triu(np.ones(attn_shape), k=1)  # 生成一个上三角矩阵
-    subsequence_mask = torch.from_numpy(subsequence_mask).byte()
+    subsequence_mask = torch.from_numpy(subsequence_mask).byte() # 这句啥意思？转换torch张量
     return subsequence_mask  # [batch_size, tgt_len, tgt_len]
 
-
+# 3.8
 # ==========================================================================================
 class ScaledDotProductAttention(nn.Module):
     def __init__(self):
@@ -82,7 +86,7 @@ class ScaledDotProductAttention(nn.Module):
                  np.sqrt(d_k)  # scores : [batch_size, n_heads, len_q, len_k]
         # mask矩阵填充scores（用-1e9填充scores中与attn_mask中值为1位置相对应的元素）
         # Fills elements of self tensor with value where mask is True.
-        scores.masked_fill_(attn_mask, -1e9)
+        scores.masked_fill_(attn_mask, -1e9) # 遮罩
 
         attn = nn.Softmax(dim=-1)(scores)  # 对最后一个维度(v)做softmax
         # scores : [batch_size, n_heads, len_q, len_k] * V: [batch_size, n_heads, len_v(=len_k), d_v]
@@ -91,7 +95,7 @@ class ScaledDotProductAttention(nn.Module):
         # context：[[z1,z2,...],[...]]向量, attn注意力稀疏矩阵（用于可视化的）
         return context, attn
 
-
+# 3.7 多头注意力
 class MultiHeadAttention(nn.Module):
     """这个Attention类可以实现:
     Encoder的Self-Attention
@@ -103,8 +107,7 @@ class MultiHeadAttention(nn.Module):
 
     def __init__(self):
         super(MultiHeadAttention, self).__init__()
-        self.W_Q = nn.Linear(d_model, d_k * n_heads,
-                             bias=False)  # q,k必须维度相同，不然无法做点积
+        self.W_Q = nn.Linear(d_model, d_k * n_heads, bias=False)  # q,k必须维度相同，不然无法做点积
         self.W_K = nn.Linear(d_model, d_k * n_heads, bias=False)
         self.W_V = nn.Linear(d_model, d_v * n_heads, bias=False)
         # 这个全连接层可以保证多头attention的输出仍然是seq_len x d_model
@@ -124,31 +127,28 @@ class MultiHeadAttention(nn.Module):
         #           线性变换               拆成多头
 
         # Q: [batch_size, n_heads, len_q, d_k]
-        Q = self.W_Q(input_Q).view(batch_size, -1,
-                                   n_heads, d_k).transpose(1, 2)
+        Q = self.W_Q(input_Q).view(batch_size, -1, n_heads, d_k).transpose(1, 2)
         # K: [batch_size, n_heads, len_k, d_k] # K和V的长度一定相同，维度可以不同
-        K = self.W_K(input_K).view(batch_size, -1,
-                                   n_heads, d_k).transpose(1, 2)
+        K = self.W_K(input_K).view(batch_size, -1, n_heads, d_k).transpose(1, 2)
         # V: [batch_size, n_heads, len_v(=len_k), d_v]
-        V = self.W_V(input_V).view(batch_size, -1,
-                                   n_heads, d_v).transpose(1, 2)
+        V = self.W_V(input_V).view(batch_size, -1, n_heads, d_v).transpose(1, 2)
 
         # 因为是多头，所以mask矩阵要扩充成4维的
         # attn_mask: [batch_size, seq_len, seq_len] -> [batch_size, n_heads, seq_len, seq_len]
         attn_mask = attn_mask.unsqueeze(1).repeat(1, n_heads, 1, 1)
 
         # context: [batch_size, n_heads, len_q, d_v], attn: [batch_size, n_heads, len_q, len_k]
-        context, attn = ScaledDotProductAttention()(Q, K, V, attn_mask)
+        context, attn = ScaledDotProductAttention()(Q, K, V, attn_mask) # 3.8
         # 下面将不同头的输出向量拼接在一起
         # context: [batch_size, n_heads, len_q, d_v] -> [batch_size, len_q, n_heads * d_v]
-        context = context.transpose(1, 2).reshape(
-            batch_size, -1, n_heads * d_v)
+        context = context.transpose(1, 2).reshape(batch_size, -1, n_heads * d_v)
 
         # 这个全连接层可以保证多头attention的输出仍然是seq_len x d_model
         output = self.fc(context)  # [batch_size, len_q, d_model]
         return nn.LayerNorm(d_model).to(device)(output + residual), attn
 
 
+# 3.9
 # Pytorch中的Linear只会对最后一维操作，所以正好是我们希望的每个位置用同一个全连接网络
 class PoswiseFeedForwardNet(nn.Module):
     def __init__(self):
@@ -166,9 +166,9 @@ class PoswiseFeedForwardNet(nn.Module):
         residual = inputs
         output = self.fc(inputs)
         # [batch_size, seq_len, d_model]
-        return nn.LayerNorm(d_model).to(device)(output + residual)
+        return nn.LayerNorm(d_model).to(device)(output + residual) # 需要
 
-
+# 3.6 编码层
 class EncoderLayer(nn.Module):
     def __init__(self):
         super(EncoderLayer, self).__init__()
@@ -184,9 +184,9 @@ class EncoderLayer(nn.Module):
         # 第一个enc_inputs * W_Q = Q
         # 第二个enc_inputs * W_K = K
         # 第三个enc_inputs * W_V = V
-        enc_outputs, attn = self.enc_self_attn(enc_inputs, enc_inputs, enc_inputs,
-                                               enc_self_attn_mask)  # enc_inputs to same Q,K,V（未线性变换前）
-        enc_outputs = self.pos_ffn(enc_outputs)
+        enc_outputs, attn = self.enc_self_attn(enc_inputs, enc_inputs, enc_inputs, enc_self_attn_mask)
+        # enc_inputs to same Q,K,V（未线性变换前）
+        enc_outputs = self.pos_ffn(enc_outputs) # 3.10
         # enc_outputs: [batch_size, src_len, d_model]
         return enc_outputs, attn
 
@@ -232,8 +232,8 @@ class Encoder(nn.Module):
         enc_outputs = self.src_emb(enc_inputs)  # [batch_size, src_len, d_model]
         enc_outputs = self.pos_emb(enc_outputs.transpose(0, 1)).transpose(0, 1)  # [batch_size, src_len, d_model] 3.3
         # Encoder输入序列的pad mask矩阵
-        enc_self_attn_mask = get_attn_pad_mask(
-            enc_inputs, enc_inputs)  # [batch_size, src_len, src_len]
+        enc_self_attn_mask = get_attn_pad_mask(enc_inputs, enc_inputs)  # [batch_size, src_len, src_len] 3.4 生成填充掩码，防止注意力计算，
+        # 为什么两个？是因为在encoder中是同一个序列，但是在decoder中是两个序列
         enc_self_attns = []  # 在计算中不需要用到，它主要用来保存你接下来返回的attention的值（这个主要是为了你画热力图等，用来看各个词之间的关系
         for layer in self.layers:  # for循环访问nn.ModuleList对象
             # 上一个block的输出enc_outputs作为当前block的输入
@@ -243,7 +243,7 @@ class Encoder(nn.Module):
             enc_self_attns.append(enc_self_attn)  # 这个只是为了可视化
         return enc_outputs, enc_self_attns
 
-
+# 3.11
 class Decoder(nn.Module):
     def __init__(self):
         super(Decoder, self).__init__()
@@ -259,8 +259,7 @@ class Decoder(nn.Module):
         enc_inputs: [batch_size, src_len]
         enc_outputs: [batch_size, src_len, d_model]   # 用在Encoder-Decoder Attention层
         """
-        dec_outputs = self.tgt_emb(
-            dec_inputs)  # [batch_size, tgt_len, d_model]
+        dec_outputs = self.tgt_emb(dec_inputs)  # [batch_size, tgt_len, d_model]
         dec_outputs = self.pos_emb(dec_outputs.transpose(0, 1)).transpose(0, 1).to(
             device)  # [batch_size, tgt_len, d_model]
         # Decoder输入序列的pad mask矩阵（这个例子中decoder是没有加pad的，实际应用中都是有pad填充的）
@@ -268,7 +267,7 @@ class Decoder(nn.Module):
             device)  # [batch_size, tgt_len, tgt_len]
         # Masked Self_Attention：当前时刻是看不到未来的信息的
         dec_self_attn_subsequence_mask = get_attn_subsequence_mask(dec_inputs).to(
-            device)  # [batch_size, tgt_len, tgt_len]
+            device)  # [batch_size, tgt_len, tgt_len] 3.12，使用上三角矩阵
 
         # Decoder中把两种mask矩阵相加（既屏蔽了pad的信息，也屏蔽了未来时刻的信息）
         dec_self_attn_mask = torch.gt((dec_self_attn_pad_mask + dec_self_attn_subsequence_mask),
@@ -278,7 +277,7 @@ class Decoder(nn.Module):
         # get_attn_pad_mask主要是enc_inputs的pad mask矩阵(因为enc是处理K,V的，求Attention时是用v1,v2,..vm去加权的，要把pad对应的v_i的相关系数设为0，这样注意力就不会关注pad向量)
         #                       dec_inputs只是提供expand的size的
         dec_enc_attn_mask = get_attn_pad_mask(
-            dec_inputs, enc_inputs)  # [batc_size, tgt_len, src_len]
+            dec_inputs, enc_inputs)  # [batc_size, tgt_len, src_len] 也就解释了之前encoder部分为啥要传入两次enc_inputs
 
         dec_self_attns, dec_enc_attns = [], []
         for layer in self.layers:
@@ -311,28 +310,28 @@ class Transformer(nn.Module):
         # enc_outputs: [batch_size, src_len, d_model],
         # enc_self_attns: [n_layers, batch_size, n_heads, src_len, src_len]
         # 经过Encoder网络后，得到的输出还是[batch_size, src_len, d_model]
-        enc_outputs, enc_self_attns = self.encoder(enc_inputs) # 3.2
+        enc_outputs, enc_self_attns = self.encoder(enc_inputs) # 3.2 enc_self_attns为了可视化
         # dec_outputs: [batch_size, tgt_len, d_model],
         # dec_self_attns: [n_layers, batch_size, n_heads, tgt_len, tgt_len], dec_enc_attn: [n_layers, batch_size, tgt_len, src_len]
         dec_outputs, dec_self_attns, dec_enc_attns = self.decoder(
-            dec_inputs, enc_inputs, enc_outputs)
+            dec_inputs, enc_inputs, enc_outputs) # dec_self_attn, dec_enc_attn这两个是为了可视化的
         # dec_outputs: [batch_size, tgt_len, d_model] -> dec_logits: [batch_size, tgt_len, tgt_vocab_size]
         dec_logits = self.projection(dec_outputs)
-        return dec_logits.view(-1, dec_logits.size(-1)), enc_self_attns, dec_self_attns, dec_enc_attns
+        return dec_logits.view(-1, dec_logits.size(-1)), enc_self_attns, dec_self_attns, dec_enc_attns # 后三个只是为了可视化
 
 # debug数据流向
 # 运行时注释掉
-if __name__ == '__main__':
-    device = 'cuda'
-    model = Transformer().to(device)
-    for enc_inputs, dec_inputs, dec_outputs in loader:
-        """
-        enc_inputs: [batch_size, src_len]
-        dec_inputs: [batch_size, tgt_len]
-        dec_outputs: [batch_size, tgt_len]
-        """
-        enc_inputs, dec_inputs, dec_outputs = enc_inputs.to(
-            device), dec_inputs.to(device), dec_outputs.to(device)
-        # outputs: [batch_size * tgt_len, tgt_vocab_size]
-        outputs, enc_self_attns, dec_self_attns, dec_enc_attns = model(
-            enc_inputs, dec_inputs)
+# if __name__ == '__main__':
+#     model = Transformer().to(device)
+#     for enc_inputs, dec_inputs, dec_outputs in loader:
+#         """
+#         enc_inputs: [batch_size, src_len]
+#         dec_inputs: [batch_size, tgt_len]
+#         dec_outputs: [batch_size, tgt_len]
+#         """
+#         enc_inputs, dec_inputs, dec_outputs = enc_inputs.to(
+#             device), dec_inputs.to(device), dec_outputs.to(device)
+#         # outputs: [batch_size * tgt_len, tgt_vocab_size]
+#         outputs, enc_self_attns, dec_self_attns, dec_enc_attns = model(
+#             enc_inputs, dec_inputs)
+#         pass
