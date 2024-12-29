@@ -34,3 +34,4 @@ for epoch in range(epochs):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        # 测试应该用验证指标最高的哪个？还是损失最低的哪个？
