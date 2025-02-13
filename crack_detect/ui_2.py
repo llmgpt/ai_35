@@ -13,10 +13,12 @@
 """
 # 前端页面
 import sys
+import cv2
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QLineEdit, \
     QRadioButton, QFileDialog
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QMessageBox
 
 # 后端调用
 from ultralytics import YOLO
@@ -56,7 +58,7 @@ class RoadDamageDetectionApp(QWidget):
         self.save_path_input = QLineEdit()
         self.save_path_input.setPlaceholderText("保存路径")
         self.save_path_input.setStyleSheet("background-color: #F0E68C;")
-        self.load_file_button.clicked.connect(self.load_file)
+        self.load_file_button.clicked.connect(self.load_weights)
         self.save_path_input.setReadOnly(True)  # 让文本框只读
         file_layout.addWidget(self.load_file_button)
         file_layout.addWidget(self.save_path_input)
@@ -127,13 +129,23 @@ class RoadDamageDetectionApp(QWidget):
         self.detection_image_path = ""
 
         # 加载模型
-        detect_weight_path = '' # 模型路径
-        self.detect_model = YOLO(detect_weight_path)
+        # 初始化模型路径为 None
+        self.detect_weight_path = None
+        self.detect_model = None
+        
+        self.images = []  # 存储文件夹中所有图片的路径
+        self.current_image_index = 0  # 当前显示图片的索引
 
-    def load_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "选择文件", "", "All Files (*)")
+    def load_weights(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "选择权重文件", "", "权重文件 (*.pth *.pt *.h5)")
         if file_path:
             self.save_path_input.setText(file_path)
+            self.detect_weight_path = file_path
+            # 尝试加载模型
+            try:
+                self.detect_model = YOLO(self.detect_weight_path)
+            except Exception as e:
+                QMessageBox.critical(self, "错误", f"无法加载模型：{e}")
 
     def select_image_path(self):
         image_path, _ = QFileDialog.getOpenFileName(self, "选择图片", "", "Images (*.png *.xpm *.jpg)")
@@ -146,19 +158,27 @@ class RoadDamageDetectionApp(QWidget):
         folder_path = QFileDialog.getExistingDirectory(self, "选择文件夹")
         if folder_path:
             self.file_path_input.setText(folder_path)
-
     def show_image(self):
         if self.selected_image_path:
             pixmap = QPixmap(self.selected_image_path)
             self.image_label.setPixmap(pixmap.scaled(self.image_label.size(), aspectRatioMode=True))
 
     def show_detection_image(self):
-        # 这里你可以替换为你想要显示的检测图片路径
-        self.detection_image_path = r"20160222_164000_1_721_2.png"
-        if self.detection_image_path:
-            pixmap = QPixmap(self.detection_image_path)
-            self.detection_label.setPixmap(pixmap.scaled(self.detection_label.size(), aspectRatioMode=True))
+        if not self.detect_model:
+            QMessageBox.warning(self, "警告", "请先加载模型权重文件。")
+            return
 
+        if self.selected_image_path:
+            img = cv2.imread(self.selected_image_path)
+            if img is None:
+                QMessageBox.critical(self, "错误", "无法读取图片。")
+                return
+
+            # 保存检测结果的路径
+            self.detection_image_path = detect_img(img, self.detect_model, self.selected_image_path)
+            if self.detection_image_path:
+                pixmap = QPixmap(self.detection_image_path)
+                self.detection_label.setPixmap(pixmap.scaled(self.detection_label.size(), aspectRatioMode=True))
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
