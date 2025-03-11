@@ -1,5 +1,15 @@
 """
-后端调用有问题，难得改,检测前端页面
+道路裂缝检测系统
+1.加载图片并显示
+2.检测按钮，点击检测，得到结果图片显示
+3.计算按钮，点击计算，得到一个随机的值
+
+参考图片编写(X)
+
+需要一个完整的项目,生成只是大概，还不如直接借用之前的零售商品系统(X)
+
+一口吃不成胖子，逐步修改。
+参照ai_35\day90\work_02_main.py
 """
 # 前端页面
 import sys
@@ -10,6 +20,10 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QMessageBox
 
+# 后端调用
+from ultralytics import YOLO
+from method import detect_img
+
 
 
 class RoadDamageDetectionApp(QWidget):
@@ -17,7 +31,7 @@ class RoadDamageDetectionApp(QWidget):
         super().__init__()
 
         self.setWindowTitle("路面病害检测系统")
-        self.setGeometry(100, 100, 1200, 800)
+        self.setGeometry(100, 100, 800, 600)
 
         # 主布局
         main_layout = QVBoxLayout()
@@ -42,7 +56,7 @@ class RoadDamageDetectionApp(QWidget):
         self.load_file_button = QPushButton("加载权限重文件")
         self.load_file_button.setStyleSheet("background-color: #FFD700; font-weight: bold;")
         self.save_path_input = QLineEdit()
-        self.save_path_input.setPlaceholderText("权重路径")
+        self.save_path_input.setPlaceholderText("保存路径")
         self.save_path_input.setStyleSheet("background-color: #F0E68C;")
         self.load_file_button.clicked.connect(self.load_weights)
         self.save_path_input.setReadOnly(True)  # 让文本框只读
@@ -118,7 +132,7 @@ class RoadDamageDetectionApp(QWidget):
         # 初始化模型路径为 None
         self.detect_weight_path = None
         self.detect_model = None
-
+        
         self.images = []  # 存储文件夹中所有图片的路径
         self.current_image_index = 0  # 当前显示图片的索引
 
@@ -127,6 +141,11 @@ class RoadDamageDetectionApp(QWidget):
         if file_path:
             self.save_path_input.setText(file_path)
             self.detect_weight_path = file_path
+            # 尝试加载模型
+            try:
+                self.detect_model = YOLO(self.detect_weight_path)
+            except Exception as e:
+                QMessageBox.critical(self, "错误", f"无法加载模型：{e}")
 
     def select_image_path(self):
         image_path, _ = QFileDialog.getOpenFileName(self, "选择图片", "", "Images (*.png *.xpm *.jpg)")
@@ -139,19 +158,27 @@ class RoadDamageDetectionApp(QWidget):
         folder_path = QFileDialog.getExistingDirectory(self, "选择文件夹")
         if folder_path:
             self.file_path_input.setText(folder_path)
-
     def show_image(self):
         if self.selected_image_path:
             pixmap = QPixmap(self.selected_image_path)
             self.image_label.setPixmap(pixmap.scaled(self.image_label.size(), aspectRatioMode=True))
 
     def show_detection_image(self):
-        # 保存检测结果的路径
-        self.detection_image_path = r'C:\1workspace\ai_35\crack_detect\img\China_Drone_000886_1.jpg'
-        if self.detection_image_path:
-            pixmap = QPixmap(self.detection_image_path)
-            self.detection_label.setPixmap(pixmap.scaled(self.detection_label.size(), aspectRatioMode=True))
+        if not self.detect_model:
+            QMessageBox.warning(self, "警告", "请先加载模型权重文件。")
+            return
 
+        if self.selected_image_path:
+            img = cv2.imread(self.selected_image_path)
+            if img is None:
+                QMessageBox.critical(self, "错误", "无法读取图片。")
+                return
+
+            # 保存检测结果的路径
+            self.detection_image_path = detect_img(img, self.detect_model, self.selected_image_path)
+            if self.detection_image_path:
+                pixmap = QPixmap(self.detection_image_path)
+                self.detection_label.setPixmap(pixmap.scaled(self.detection_label.size(), aspectRatioMode=True))
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

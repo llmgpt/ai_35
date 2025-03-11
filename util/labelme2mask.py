@@ -51,6 +51,6 @@ def create_mask_with_random_drops(json_file, output_mask_path, drop_rate=0.1):
     cv2.imwrite(output_mask_path, mask)
 
 # 示例用法
-json_file = r'C:\1workspace\ai_35\crack_detect\img\output_dir\img2.json'
-output_mask_path = r'C:\1workspace\ai_35\crack_detect\img\output_dir\mask2.png'
-create_mask_with_random_drops(json_file, output_mask_path)
+json_file = r'C:\1workspace\ai_35\crack_detect\img\output_dir\img.json'
+output_mask_path = r'C:\1workspace\ai_35\crack_detect\img\output_dir\mask.png'
+create_mask_from_json(json_file, output_mask_path)
