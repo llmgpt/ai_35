@@ -17,7 +17,7 @@ pip install torch==1.10.1+cu102 torchvision==0.11.2+cu102 torchaudio==0.10.1 -f 
 conda install pytorch==1.10.0 torchvision==0.11.0 torchaudio==0.10.0 cudatoolkit=11.3
 
 4.检查cuda是否可用
-torch.cuda.is_available()
+torch.cuda.is_available()[Log.py](../../Users/adm/Desktop/Log.py)
 
 5.清华源
 https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/pytorch/win-64/
