@@ -12,7 +12,7 @@ from PyQt5.QtCore import Qt, QRect
 class LoginWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(" 可视化道路病害量化提取系统")  # 设置窗口标题
+        self.setWindowTitle(" 道路裂缝缺陷识别系统")  # 设置窗口标题
         self.setFixedSize(1200, 800)  # 固定窗口尺寸
 
         # 设置背景（需准备road_bg.jpg 图片）
@@ -21,7 +21,7 @@ class LoginWindow(QMainWindow):
         self.background.setGeometry(0, 0, 1200, 800)
 
         # 绘制标题 
-        self.title = QLabel("可视化道路病害量化提取系统", self)
+        self.title = QLabel("道路裂缝缺陷识别系统", self)
         self.title.setGeometry(200, 50, 800, 80)
         self.title.setStyleSheet(""" 
             QLabel {

@@ -11,7 +11,7 @@ from PyQt5.QtGui import QFont, QColor, QPalette
 class DiseaseDetectionSystem(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("病害分割系统")
+        self.setWindowTitle("道路裂缝缺陷分割系统")
         self.setGeometry(100, 100, 1200, 800)
         self.setStyleSheet("""
             QMainWindow {background: #f5f5f5;}
@@ -33,7 +33,7 @@ class DiseaseDetectionSystem(QMainWindow):
         left_layout.setSpacing(15)
 
         # 标题栏
-        title_bar = QLabel("路面病害智能分割系统")
+        title_bar = QLabel("道路裂缝缺陷分割系统")
         title_bar.setFont(QFont('Microsoft YaHei', 18, QFont.Bold))
         title_bar.setAlignment(Qt.AlignCenter)
         title_bar.setStyleSheet("background: #2196F3; color: white; border-radius: 8px; padding: 12px;")
@@ -143,7 +143,7 @@ class DiseaseDetectionSystem(QMainWindow):
         pci_layout = QVBoxLayout()
 
         # PCI值显示标签
-        self.pci_value_label = QLabel("PCI: 未计算")
+        self.pci_value_label = QLabel("缺陷像素占比: 未计算")
         self.pci_value_label.setStyleSheet(""" 
             QLabel {
                 font-size: 24px;
@@ -158,7 +158,7 @@ class DiseaseDetectionSystem(QMainWindow):
         pci_layout.addWidget(self.pci_value_label)
 
         # 计算按钮
-        self.calc_pci_btn = QPushButton("计算PCI")
+        self.calc_pci_btn = QPushButton("计算")
         self.calc_pci_btn.setStyleSheet(""" 
             QPushButton {
                 background: #9C27B0;
@@ -347,7 +347,7 @@ class DiseaseDetectionSystem(QMainWindow):
             return
 
         # 模拟分割结果
-        result_path = r'C:\1workspace\ai_35\crack_detect\img\output_dir\mask.png'
+        result_path = r'C:\1workspace\ai_35\crack_detect\img\output_dir\mask2.png'
         self.output_pixmap = QPixmap(result_path)
         self.output_image.setPixmap(self.output_pixmap.scaled(
             self.output_image.size(),
@@ -360,8 +360,8 @@ class DiseaseDetectionSystem(QMainWindow):
         QMessageBox.information(self, "提示", "人工修正功能尚未实现")
 
     def calculate_pci(self):
-        pci = 92.288
-        self.pci_value_label.setText(f"PCI:  {pci:.2f}")
+        pci = 0.32
+        self.pci_value_label.setText(f"缺陷像素占比:  {pci:.2f}")
         self.pci_value_label.setStyleSheet("color:  #4CAF50; font-size: 24px;")
         pass
 

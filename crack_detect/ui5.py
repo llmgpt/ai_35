@@ -13,7 +13,7 @@ from PyQt5.QtGui import QFont, QColor, QPalette
 class DiseaseDetectionSystem(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("病害检测系统")
+        self.setWindowTitle("道路裂缝缺陷检测系统")
         self.setGeometry(100, 100, 1200, 800)
         self.setStyleSheet("""
             QMainWindow {background: #f5f5f5;}
@@ -35,7 +35,7 @@ class DiseaseDetectionSystem(QMainWindow):
         left_layout.setSpacing(15)
 
         # 标题栏
-        title_bar = QLabel("路面病害智能检测系统")
+        title_bar = QLabel("道路裂缝缺陷检测系统")
         title_bar.setFont(QFont('Microsoft YaHei', 18, QFont.Bold))
         title_bar.setAlignment(Qt.AlignCenter)
         title_bar.setStyleSheet("background: #2196F3; color: white; border-radius: 8px; padding: 12px;")
@@ -295,7 +295,7 @@ class DiseaseDetectionSystem(QMainWindow):
             return
 
         # 模拟检测结果
-        result_path = r'C:\1workspace\ai_35\crack_detect\img\China_Drone_000886_1.jpg'
+        result_path = r'C:\1workspace\ai_35\crack_detect\img\China_Drone_001765_1.jpg'
         self.output_pixmap = QPixmap(result_path)
         self.output_image.setPixmap(self.output_pixmap.scaled(
             self.output_image.size(),

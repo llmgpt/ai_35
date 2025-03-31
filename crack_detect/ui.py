@@ -30,7 +30,7 @@ class RoadDamageDetectionApp(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("路面病害检测系统")
+        self.setWindowTitle("道路裂缝缺陷识别系统")
         self.setGeometry(100, 100, 800, 600)
 
         # 主布局
